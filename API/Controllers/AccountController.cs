@@ -70,6 +70,10 @@ namespace API.Controllers
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.OK, "Password changed successfully.");
                 }
+                else if (result == 0)
+                {
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Email is not registered!");
+                }
                 else if (result == -1)
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "OTP Code is wrong!");
@@ -78,7 +82,7 @@ namespace API.Controllers
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "OTP Code was expired!");
                 }
-                else if (result == 0)
+                else if (result == -3)
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Doesn't match Password!");
                 } else

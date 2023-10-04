@@ -14,19 +14,88 @@ using static System.Net.WebRequestMethods;
 using API.Models;
 using BCrypt.Net;
 using API.ViewModel;
+using Microsoft.Extensions.Options;
+using API.Utils;
 
 namespace API.Repository
 {
     public class AccountRepository: IAccountRepository
     {
         private readonly MyContext context;
-        private readonly IConfiguration _config;
+        private readonly EmailConfig _config;
         private readonly int salt = 12;
 
-        public AccountRepository(MyContext context, IConfiguration config)
+        public AccountRepository(MyContext context, IOptions<EmailConfig> config)
         {
             this.context = context;
-            _config = config;
+            _config = config.Value;
+        }
+
+        public bool Login(string email, string password)
+        {
+            var emp = context.Employees.Join(
+                                        context.Accounts,
+                                        emp => emp.NIK,
+                                        acc => acc.NIK,
+                                        (emp, acc) => new { 
+                                            Email = emp.Email,
+                                            Password = acc.Password
+                                        }
+                                    ).Where(e => e.Email == email).FirstOrDefault();
+            bool verify = BCrypt.Net.BCrypt.Verify(password, emp.Password);
+
+            return emp != null && verify !=false;
+        }
+
+        public bool ForgotPassword(string email)
+        {
+            var data = context.Employees.Join(
+                                        context.Accounts,
+                                        emp => emp.NIK,
+                                        acc => acc.NIK,
+                                        (emp, acc) => new {
+                                            NIK = emp.NIK,
+                                            FullName = emp.FirstName + " " + emp.LastName,
+                                            Email = emp.Email,
+                                            Password = acc.Password,
+                                        }
+                                    ).SingleOrDefault(e => e.Email == email);
+            if (data == null)
+            {
+                return false;
+            }
+            else
+            {
+                string OTP = GenerateOTP();
+                if (CheckOTP(OTP) == false)
+                {
+                    return false;
+                }
+                else
+                {
+                    DateTime date = DateTime.Now;
+                    TimeSpan time = new TimeSpan(0, 0, 2, 0);
+                    DateTime exp = date.Add(time);
+
+                    var account = new Account
+                    {
+                        NIK = data.NIK,
+                        Password = data.Password,
+                        OTP = OTP,
+                        Expired = exp
+                    };
+                    context.Entry(account).State = EntityState.Modified;
+                    context.SaveChanges();
+
+                    string msg = "Hello " + data.FullName + ", please don't give this code to anyone. Your OTP Code is <b>" + OTP + "</b>";
+
+                    IOptions<EmailConfig> config;
+                    EmailHelpers mail = new EmailHelpers(_config);
+                    mail.SendMail(data.FullName, data.Email, "Reset Password", msg);
+
+                    return true;
+                }
+            }
         }
 
         public int ChangePassword(PasswordViewModel body)
@@ -52,9 +121,10 @@ namespace API.Repository
             else
             {
                 DateTime now = DateTime.Now;
+
                 if (body.Password != body.VerifyPassword)
                 {
-                    return 0;
+                    return -3;
                 }
                 else if (body.OTP != data.OTP)
                 {
@@ -63,7 +133,6 @@ namespace API.Repository
                 else if (data.Expired < now)
                 {
                     return -2;
-
                 }
                 else
                 {
@@ -81,89 +150,16 @@ namespace API.Repository
                 }
             }
         }
-
-        public bool ForgotPassword(string email)
+        public string GenerateOTP()
         {
-            var data = context.Employees.Join(
-                                        context.Accounts,
-                                        emp => emp.NIK,
-                                        acc => acc.NIK,
-                                        (emp, acc) => new { 
-                                            NIK = emp.NIK,
-                                            FullName = emp.FirstName + " "+ emp.LastName,
-                                            Email = emp.Email,
-                                            Password = acc.Password,
-                                        }
-                                    ).SingleOrDefault(e => e.Email == email);
-            if (data == null) { 
-                return false;
-            } else
-            {
-                var mail = new MimeMessage();
-                var emailConfig = _config.GetValue<String>("EmailConfiguration");
-
-                mail.From.Add(new MailboxAddress("DotNet App", "manghellfrog666@gmail.com"));
-                mail.To.Add(new MailboxAddress(data.FullName, email));
-
-                var bodyBuilder = new BodyBuilder();
-
-                Random rand = new Random();
-                string OTP = (rand.Next(999999)).ToString();
-
-                var check_otp = context.Accounts.SingleOrDefault(acc => acc.OTP == OTP);
-
-                if (check_otp != null)
-                {
-                    return false;
-                }
-                else
-                {
-                    DateTime date = DateTime.Now;
-                    TimeSpan time = new TimeSpan(0, 0, 2, 0);
-                    DateTime exp = date.Add(time);
-                    var account = new Account
-                    {
-                        NIK = data.NIK,
-                        Password = data.Password,
-                        OTP = OTP,
-                        Expired = exp
-                    };
-                    context.Entry(account).State = EntityState.Modified;
-                    context.SaveChanges();
-
-                    mail.Subject = "Reset Password";
-                    bodyBuilder.HtmlBody = "Hello " + data.FullName + ", please don't give this code to anyone. Your OTP Code is <b>" + OTP + "</b>";
-                    mail.Body = bodyBuilder.ToMessageBody();
-                    using (var smtp = new MailKit.Net.Smtp.SmtpClient())
-                    {
-                        smtp.CheckCertificateRevocation = false;
-                        smtp.Connect("smtp.gmail.com", 465, true);
-
-                        // Note: only needed if the SMTP server requires authentication
-                        smtp.Authenticate("manghellfrog666@gmail.com", "d e dw nlmv s ics r ero");
-
-                        smtp.Send(mail);
-                        smtp.Disconnect(true);
-                    }
-                    return true;
-                }
-            }
+            Random rand = new Random();
+            return (rand.Next(999999)).ToString();
         }
 
-        public bool Login(string email, string password)
+        public bool CheckOTP(string OTP)
         {
-            var emp = context.Employees.Join(
-                                        context.Accounts,
-                                        emp => emp.NIK,
-                                        acc => acc.NIK,
-                                        (emp, acc) => new { 
-                                            Email = emp.Email,
-                                            Password = acc.Password
-                                        }
-                                    ).Where(e => e.Email == email).FirstOrDefault();
-            bool verify = BCrypt.Net.BCrypt.Verify(password, emp.Password);
-
-            return emp != null && verify !=false;
+            var result = context.Accounts.SingleOrDefault(acc => acc.OTP == OTP);
+            if (result == null) { return true; } else { return false; }
         }
     }
 }

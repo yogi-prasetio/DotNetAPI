@@ -1,6 +1,9 @@
 using API.context;
 using API.Repository;
+using API.ViewModel;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +21,14 @@ builder.Services.AddDbContext<MyContext>(options =>
 builder.Services.AddScoped<EmployeeRepository>();
 builder.Services.AddScoped<AccountRepository>();
 
+builder.Services.Configure<EmailConfig>(builder.Configuration.GetSection("EmailConfiguration"));
+
+var provider = builder.Services.BuildServiceProvider();
+var configuration = provider.GetService<IConfiguration>();
+
 var app = builder.Build();
+
+// This method gets called by the runtime. Use this method to add services to the container.
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
