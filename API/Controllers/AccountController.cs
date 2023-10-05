@@ -19,18 +19,22 @@ namespace API.Controllers
         }
         
         [HttpPost("Login")]
-        public ActionResult Login(string email, string password)
+        public ActionResult Login(LoginViewModel loginViewModel)
         {
             try
             {
-                var emp = accountRepository.Login(email, password);
-                if (emp)
+                var result = accountRepository.Login(loginViewModel);
+                if (result > 0)
                 {
-                    return ResponseHelpers.CreateResponse(HttpStatusCode.OK, "Login Success!", emp);
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.OK, "Login Success!");
+                }
+                else if (result < 0)
+                {
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotFound, "Login Failed! Password is wrong.");
                 }
                 else
                 {
-                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotFound, "Login Failed! Email or password is wrong.", emp);
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotFound, "Login Failed! Email is not registered.");
                 }
             }
             catch (Exception ex)
@@ -45,11 +49,14 @@ namespace API.Controllers
             try
             {
                 var send_mail = accountRepository.ForgotPassword(email);
-                if (send_mail)
+                if (send_mail > 0)
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.OK, "The OTP code has been sent, please check your email.");
                 }
-                else
+                else if (send_mail < 0)
+                {
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotFound, "OTP code has been used.");
+                }
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotFound, "Email is not registered.");
                 }

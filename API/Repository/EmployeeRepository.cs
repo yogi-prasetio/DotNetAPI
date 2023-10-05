@@ -49,14 +49,27 @@ namespace API.Repository
 
         public int FindPhone(string phone)
         {
-            var row = context.Employees.Where(e => e.Phone == phone).ToList();
-            return row.Count;
+            var row = context.Employees.SingleOrDefault(e => e.Phone == phone);
+            if(row != null)
+            {
+                return 1;
+            } else
+            {
+                return 0;
+            }
         }
 
         public int FindEmail(string email)
         {
-            var row = context.Employees.Where(e => e.Email == email).ToList();
-            return row.Count;
+            var row = context.Employees.SingleOrDefault(e => e.Email == email);
+            if (row != null)
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
         }
         public string GenerateNIK()
         {

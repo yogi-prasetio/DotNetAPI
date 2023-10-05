@@ -68,17 +68,17 @@ namespace API.Controllers
                 var phone = employeeRepository.FindPhone(employee.Phone);
                 var email = employeeRepository.FindEmail(employee.Email);
 
-                if (phone > 0 && email > 0)
+                if (email > 0 && phone > 0)
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Phone and Email is registered");
-                }
-                else if (email > 0)
-                {
-                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Email is registered");
                 }
                 else if (phone > 0)
                 {
                     return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Phone is registered");
+                }
+                else if (email > 0)
+                {
+                    return ResponseHelpers.CreateResponse(HttpStatusCode.NotImplemented, "Email is registered");
                 }
                 else
                 {
@@ -99,7 +99,7 @@ namespace API.Controllers
                 return ResponseHelpers.CreateResponse(HttpStatusCode.InternalServerError, ex.Message);
             }
         }
-        [HttpPatch]
+        [HttpPut]
         public ActionResult Update(Employee employee)
         {
             try

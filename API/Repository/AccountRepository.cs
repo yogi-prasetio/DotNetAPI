@@ -31,7 +31,7 @@ namespace API.Repository
             _config = config.Value;
         }
 
-        public bool Login(string email, string password)
+        public int Login(LoginViewModel data)
         {
             var emp = context.Employees.Join(
                                         context.Accounts,
@@ -41,13 +41,26 @@ namespace API.Repository
                                             Email = emp.Email,
                                             Password = acc.Password
                                         }
-                                    ).Where(e => e.Email == email).FirstOrDefault();
-            bool verify = BCrypt.Net.BCrypt.Verify(password, emp.Password);
-
-            return emp != null && verify !=false;
+                                    ).Where(e => e.Email == data.Email).SingleOrDefault();
+            if(emp == null)
+            {
+                return 0;
+            }            
+            else
+            {
+                bool verify = BCrypt.Net.BCrypt.Verify(data.Password, emp.Password);
+                if (!verify)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 1;
+                }
+            }
         }
 
-        public bool ForgotPassword(string email)
+        public int ForgotPassword(string email)
         {
             var data = context.Employees.Join(
                                         context.Accounts,
@@ -62,14 +75,14 @@ namespace API.Repository
                                     ).SingleOrDefault(e => e.Email == email);
             if (data == null)
             {
-                return false;
+                return 0;
             }
             else
             {
                 string OTP = GenerateOTP();
                 if (CheckOTP(OTP) == false)
                 {
-                    return false;
+                    return -1;
                 }
                 else
                 {
@@ -93,7 +106,7 @@ namespace API.Repository
                     EmailHelpers mail = new EmailHelpers(_config);
                     mail.SendMail(data.FullName, data.Email, "Reset Password", msg);
 
-                    return true;
+                    return 1;
                 }
             }
         }
@@ -142,6 +155,7 @@ namespace API.Repository
                         NIK = data.NIK,
                         Password = hashPassword,
                         OTP = data.OTP,
+                        Expired = data.Expired
                     };
                     context.Entry(account).State = EntityState.Modified;
                     context.SaveChanges();
